@@ -76,7 +76,7 @@ def filtered_average_metrics(metrics, n = 2):
 
     # Consider only the top 3 metrics
     top3_metrics = sorted_metrics[:2]
-    
+
     # Calculate mean averages for the top 3 metrics
     accuracies_tf = np.mean([metric["accuracy"] for _, metric in top3_metrics])
     accuracies = np.mean([metric["acc"] for _, metric in top3_metrics])
@@ -91,6 +91,7 @@ def filtered_average_metrics(metrics, n = 2):
         "prec": precisions,
         "f1": f1s,
     }
+
 
 # Define strategy and the custom aggregation function for the evaluation metrics
 strategy = fl.server.strategy.FedAvg(evaluate_metrics_aggregation_fn=filtered_average_metrics)
