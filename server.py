@@ -44,8 +44,8 @@ def average_metrics(metrics):
         "f1": f1s,
     }
 
-def filtered_average_metrics(metrics):
-    """Aggregate metrics from the top 3 clients by calculating mean averages.
+def filtered_average_metrics(metrics, n = 2):
+    """Aggregate metrics from the top 2 clients by calculating mean averages.
 
     Parameters:
     - metrics (list): A list containing tuples, where each tuple represents metrics for a client.
@@ -75,14 +75,14 @@ def filtered_average_metrics(metrics):
     sorted_metrics = sorted(metrics, key=lambda x: x[1]["accuracy"], reverse=True)
 
     # Consider only the top 3 metrics
-    top3_metrics = sorted_metrics[:3]
-
+    top3_metrics = sorted_metrics[:2]
+    
     # Calculate mean averages for the top 3 metrics
-    accuracies_tf = np.mean([metric[1]["accuracy"] for _, metric in top3_metrics])
-    accuracies = np.mean([metric[1]["acc"] for _, metric in top3_metrics])
-    recalls = np.mean([metric[1]["rec"] for _, metric in top3_metrics])
-    precisions = np.mean([metric[1]["prec"] for _, metric in top3_metrics])
-    f1s = np.mean([metric[1]["f1"] for _, metric in top3_metrics])
+    accuracies_tf = np.mean([metric["accuracy"] for _, metric in top3_metrics])
+    accuracies = np.mean([metric["acc"] for _, metric in top3_metrics])
+    recalls = np.mean([metric["rec"] for _, metric in top3_metrics])
+    precisions = np.mean([metric["prec"] for _, metric in top3_metrics])
+    f1s = np.mean([metric["f1"] for _, metric in top3_metrics])
 
     return {
         "accuracy": accuracies_tf,
@@ -93,7 +93,10 @@ def filtered_average_metrics(metrics):
     }
 
 # Define strategy and the custom aggregation function for the evaluation metrics
-strategy = fl.server.strategy.FedAvg(evaluate_metrics_aggregation_fn=average_metrics)
+strategy = fl.server.strategy.FedAvg(evaluate_metrics_aggregation_fn=filtered_average_metrics)
+
+# Checkout the server configuration
+# .
 
 # Start Flower server
 fl.server.start_server(
