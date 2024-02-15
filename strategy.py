@@ -24,6 +24,8 @@ from abc import ABC, abstractmethod
 
 # Try to find the parameters ins and use them in the criterion; also, implement the fedcs there.
 # implement it in the select in the criteria
+# find out more about the linking between the client and how it's being using within the proxy and client manager
+
 class Criterion(ABC):
     """Abstract class which allows subclasses to implement criterion sampling."""
 
@@ -36,7 +38,7 @@ class AdjustedCriterion(Criterion):
     def select(self, client: ClientProxy) -> bool:
 
         """Decide whether a client should be eligible for sampling or not."""
-        print(client.cid,client)
+        print(client.cid,client.properties)
 
         return True
 
@@ -199,13 +201,15 @@ class FedAvg(Strategy):
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
         fit_ins = FitIns(parameters, config)
-
+        # print(fit_ins)
         # Sample clients
         sample_size, min_num_clients = self.num_fit_clients(
             client_manager.
             num_available()
         )
-        clients = client_manager.sample(criterion= AdjustedCriterion(),
+        # print("PARAMETERS", parameters)
+
+        clients = client_manager.sample(criterion= AdjustedCriterion( ),
             num_clients=sample_size, min_num_clients=min_num_clients
         )
 
@@ -235,7 +239,7 @@ class FedAvg(Strategy):
         clients = client_manager.sample(criterion=AdjustedCriterion(),
             num_clients=sample_size, min_num_clients=min_num_clients
         )
-
+        print(clients[0])
         # Return client/config pairs
         return [(client, evaluate_ins) for client in clients]
 

@@ -19,7 +19,7 @@ class Criterion(ABC):
     def select(self, client: ClientProxy) -> bool:
 
         """Decide whether a client should be eligible for sampling or not."""
-        print(client.cid,client.get_properties())
+        print(client.cid,client.properties)
 
 # Define metrics aggregation function
 def average_metrics(metrics):
@@ -112,6 +112,7 @@ def filtered_average_metrics(metrics, n=2):
         "prec": precisions,
         "f1": f1s,
     }
+
 from strategy import FedAvg
 # Define strategy and the custom aggregation function for the evaluation metrics
 strategy = FedAvg(evaluate_metrics_aggregation_fn=filtered_average_metrics)
@@ -221,7 +222,7 @@ class AdjustedClientManager(ClientManager):
                 num_clients,
             )
             return []
-
+        
         sampled_cids = random.sample(available_cids, num_clients)
         return [self.clients[cid] for cid in sampled_cids]
 
