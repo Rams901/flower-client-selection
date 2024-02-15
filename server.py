@@ -108,7 +108,10 @@ def filtered_average_metrics(metrics, n = 2):
 strategy = fl.server.strategy.FedAvg(evaluate_metrics_aggregation_fn=filtered_average_metrics)
 
 # Checkout the server configuration
-# .
+#
+# work on how client manager controls the different clients
+# add the fed-cs
+
 class AdjustedClientManager(ClientManager):
     """Provides a pool of available clients."""
 
