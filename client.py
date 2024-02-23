@@ -7,13 +7,12 @@ import tensorflow as tf
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from flwr_datasets import FederatedDataset
 import argparse
+from typing import Dict
+
 
 # Make TensorFlow log less verbose
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-# Ranim read timeout error maeneha juste mochklet cnx ama good job on upgrading pip
-# installity wela?installit chnowa; akel exe te3 python 11 ey howa fech ta3Mli?
-# Load model (MobileNetV2)
 model = tf.keras.applications.MobileNetV2((32, 32, 3), classes=10, weights=None)
 model.compile("adam", "sparse_categorical_crossentropy", metrics=["accuracy"])
 
@@ -41,10 +40,18 @@ def eval_learning(y_test, y_pred):
 # How do clients get detected in the server when registering them in the Client manager...
 
 # Define Flower client
-class FlowerClient(fl.client.NumPyClient):
+class FlowerClient(fl.client.NumPyClient): 
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
+        properties: Dict,
+    ) -> None:
+        """Initialise the client.
 
-    def set_context(self, context: Context) -> None:
-        return super().set_context(context)
+        :param cid: The client ID.
+        :param metrics: Dictionary that represents demographic data about the client
+        """
+        
+        self.properties = properties
     
     def get_parameters(self, config):
         return model.get_weights()
@@ -93,11 +100,9 @@ def main():
     age = args.age
     race = args.race
     location = args.location
-    
 
-
-    client = FlowerClient()
-    client.set_context({'age': age, 'race': race, 'location': location})
+    client = FlowerClient(properties = {'age': age, 'race': race, 'location': location})
+    # client.metrics()
 
     # Start Flower client
     fl.client.start_client(

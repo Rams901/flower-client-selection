@@ -1,6 +1,7 @@
 import threading
 import random
 import flwr as fl
+from flwr.server.fleet.grpc_bidi.grpc_bridge import GrpcBridge
 import numpy as np
 from flwr.server.client_manager import ClientManager
 from abc import ABC, abstractmethod
@@ -8,9 +9,10 @@ from logging import INFO
 from typing import Dict, List, Optional
 
 from flwr.common.logger import log
+import math
 
 from flwr.server.client_proxy import ClientProxy
-
+from flwr.server.fleet.grpc_bidi.grpc_client_proxy import GrpcClientProxy
 
 class Criterion(ABC):
     """Abstract class which allows subclasses to implement criterion sampling."""
@@ -19,7 +21,7 @@ class Criterion(ABC):
     def select(self, client: ClientProxy) -> bool:
 
         """Decide whether a client should be eligible for sampling or not."""
-        print(client.cid,client.properties)
+        print(client.cid,client.metrics)
 
 # Define metrics aggregation function
 def average_metrics(metrics):
@@ -169,7 +171,7 @@ class AdjustedClientManager(ClientManager):
         """
         if client.cid in self.clients:
             return False
-
+        
         self.clients[client.cid] = client
         with self._cv:
             self._cv.notify_all()
@@ -205,26 +207,49 @@ class AdjustedClientManager(ClientManager):
         # Block until at least num_clients are connected.
         if min_num_clients is None:
             min_num_clients = num_clients
+        # print("Wating!")
         self.wait_for(min_num_clients)
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
-        if criterion is not None:
-            available_cids = [
-                cid for cid in available_cids if criterion.select(client = self.clients[cid])
-            ]
-
+        # print('before condition')
         if num_clients > len(available_cids):
-            log(
-                INFO,
+            print(
                 "Sampling failed: number of available clients"
-                " (%s) is less than the number of requested clients (%s).",
+                " (%s) is less than number of requested clients (%s).",
                 len(available_cids),
                 num_clients,
             )
             return []
+        # print("after condition")
+        # Have a fair partition from each demographic group by race
+        # Following Fjord Rules in filtering by p-values for a balanced selection
+        # construct p to available cids
+        races_by_clients: Dict[float, List[int]] = {}
+        random.shuffle(available_cids)
+        for cid_s in available_cids:
+            client_id = cid_s
+            race = self.clients[client_id].metrics['race']
+            if race in races_by_clients.keys():
+                races_by_clients[race].append(client_id)
+            else:
+                races_by_clients[race] = [client_id]
         
-        sampled_cids = random.sample(available_cids, num_clients)
-        return [self.clients[cid] for cid in sampled_cids]
+        minority = min([len(x) for x in races_by_clients.values()])
+        
+
+        # print(available_cids, len(races_by_clients))
+        # print(cl_per_tier)
+        selected_cids = set()
+        for race in races_by_clients.keys():
+            # print(races_by_clients[race])
+            random.shuffle(races_by_clients[race])
+            # print(type(races_by_clients[race]), minority)
+            for cid in (races_by_clients[race][:minority]):
+                selected_cids.add(cid)
+        
+        print(f"Sampled clients with a equal distribution;\nfrom {[(race, len(val)) for (race, val) in races_by_clients.items()]} to equally distributed {minority} clients per race")
+        return [self.clients[str(cid)] for cid in selected_cids]
+
 
     # FedCS Algorithm
     def fedcs(self, strategy, num_rounds=3):
@@ -275,11 +300,111 @@ class AdjustedClientManager(ClientManager):
                 print('selected clients list in the round')
 
         return selected_clients
+    
+# from flwr.server.superlink.fleet.grpc_bidi.grpc_client_proxy import GrpcClientProxy
 
 # Start Flower server with FedCS
 client_manager = AdjustedClientManager()
 #fedcs_thread = threading.Thread(target=client_manager.fedcs, args=(strategy, 3))
 # fedcs_thread.start()
+from flwr.common import (
+    Code,
+    DisconnectRes,
+    EvaluateIns,
+    EvaluateRes,
+    FitIns,
+    FitRes,
+    GetParametersIns,
+    GetParametersRes,
+    GetPropertiesIns,
+    GetPropertiesRes,
+    Parameters,
+    ReconnectIns,
+    Status,
+    ndarray_to_bytes,
+)
+from flwr.common import serde
+
+
+class SuccessClient(GrpcClientProxy):
+    def __init__(self, cid: str, metrics:Dict, bridge: GrpcBridge):
+        super().__init__(cid, bridge)
+        self.metrics = metrics
+
+        # super().__init__(cid, bridge)
+    """Test class."""
+
+    # def get_properties(
+    #     self,
+    #     ins: GetPropertiesIns,
+    #     timeout: Optional[float],
+    # ) -> GetPropertiesRes:
+    #     """Request client's set of internal properties."""
+    #     get_properties_msg = serde.get_properties_ins_to_proto(ins)
+    #     res_wrapper: ResWrapper = self.bridge.request(
+    #         ins_wrapper=InsWrapper(
+    #             server_message=ServerMessage(get_properties_ins=get_properties_msg),
+    #             timeout=timeout,
+    #         )
+    #     )
+    #     client_msg: ClientMessage = res_wrapper.client_message
+    #     get_properties_res = serde.get_properties_res_from_proto(
+    #         client_msg.get_properties_res
+    #     )
+    #     return get_properties_res
+    
+    # def get_parameters(
+    #     self, ins: GetParametersIns, timeout: Optional[float]
+    # ) -> GetParametersRes:
+    #     """Raise a error because this method is not expected to be called."""
+    #     raise NotImplementedError()
+
+    # def fit(self, ins: FitIns, timeout: Optional[float]) -> FitRes:
+    #     """Simulate fit by returning a success FitRes with simple set of weights."""
+    #     arr = np.array([[1, 2], [3, 4], [5, 6]])
+    #     arr_serialized = ndarray_to_bytes(arr)
+    #     return FitRes(
+    #         status=Status(code=Code.OK, message="Success"),
+    #         parameters=Parameters(tensors=[arr_serialized], tensor_type=""),
+    #         num_examples=1,
+    #         metrics={},
+    #     )
+
+    # def evaluate(self, ins: EvaluateIns, timeout: Optional[float]) -> EvaluateRes:
+    #     """Simulate evaluate by returning a success EvaluateRes with loss 1.0."""
+    #     return EvaluateRes(
+    #         status=Status(code=Code.OK, message="Success"),
+    #         loss=1.0,
+    #         num_examples=1,
+    #         metrics={},
+    #     )
+
+    # def reconnect(self, ins: ReconnectIns, timeout: Optional[float]) -> DisconnectRes:
+    #     """Simulate reconnect by returning a DisconnectRes with UNKNOWN reason."""
+    #     return DisconnectRes(reason="UNKNOWN")
+
+    
+from unittest.mock import MagicMock
+import uuid
+def default_bridge_factory() -> GrpcBridge:
+    """Return GrpcBridge instance."""
+    return GrpcBridge()
+
+from demographic_gen import demographics_factory
+
+def SuccessClientFactory():
+    cid = uuid.uuid4().hex
+    metrics = demographics_factory()
+
+    return SuccessClient(cid, metrics, GrpcBridge())
+
+for _ in range(50):
+    loc_client = SuccessClientFactory()
+    client_manager.register(loc_client)
+# either we fake the bridge using the criterion test
+# or find a way to link between the SuccessClient and customManger
+
+# client_manager.register(client2)
 
 # Start Flower server
 fl.server.start_server(

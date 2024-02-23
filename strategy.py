@@ -33,12 +33,13 @@ class Criterion(ABC):
     def select(self, client: ClientProxy) -> bool:
 
         """Decide whether a client should be eligible for sampling or not."""
+
 class AdjustedCriterion(Criterion):
 
     def select(self, client: ClientProxy) -> bool:
 
         """Decide whether a client should be eligible for sampling or not."""
-        print(client.cid,client.properties)
+        print(client.cid, client.metrics)
 
         return True
 
@@ -57,6 +58,7 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
+
 from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
@@ -70,7 +72,6 @@ Setting `min_available_clients` lower than `min_fit_clients` or
 connected to the server. `min_available_clients` must be set to a value larger
 than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
 """
-
 
 # pylint: disable=line-too-long
 class FedAvg(Strategy):
@@ -191,6 +192,7 @@ class FedAvg(Strategy):
             return None
         loss, metrics = eval_res
         return loss, metrics
+
 
     def configure_fit(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
