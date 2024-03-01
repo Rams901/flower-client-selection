@@ -4,11 +4,18 @@ import flwr as fl
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from tensorflow.python.keras.models import Sequential
-from tensorflow.python.keras.layers import Dense
+# from tensorflow.python.keras.models import Sequential
+# from tensorflow.python.keras.layers import Dense
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from tensorflow.python.keras.layers import Dense, Dropout
+
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras import Sequential
+from tensorflow.keras.activations import sigmoid
+
+from tensorflow.keras.callbacks import TensorBoard
+
 
 import argparse
 
@@ -18,7 +25,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # Constants
 SAMPLING_FRACTION = 0.8
 
-fds = pd.read_csv('datasets\data_acs.csv')
+fds = pd.read_csv('datasets/data_acs.csv')
 X = fds.drop(columns="ESR")
 y = fds['ESR']
 x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -53,13 +60,14 @@ class FlowerClient(fl.client.NumPyClient):
         self.client_id = client_id
         self.gender_distribution = gender_distribution
         self.model = model
+        self.tensorboard_callback = TensorBoard(log_dir=f"logs/sequantial_client_{client_id}", histogram_freq=1, write_images=True)
 
         client_data = fds[fds['SEX'] == gender_distribution[client_id]]
         client_data = client_data.sample(frac=SAMPLING_FRACTION)
         biased_data = fds[fds['SEX'] != gender_distribution[client_id]]
 
         client_data = pd.concat([biased_data.sample(frac=(1 - SAMPLING_FRACTION)), client_data])
-        print(client_data.head(5))
+        client_data = client_data
         self.male_samples, self.female_samples = (client_data['SEX'] == 1.0).values,  (client_data['SEX'] == 2.0).values
         
         X, y = client_data.drop(columns="ESR"), client_data['ESR']
@@ -78,12 +86,9 @@ class FlowerClient(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         self.model.set_weights(parameters)
-         # Create TensorBoard callback
-        # log_dir = "logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-        # tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
-
+    
         # Train the model on the selected data
-        self.model.fit(self.x_train, self.y_train, epochs=5, batch_size=32)
+        self.model.fit(self.x_train, self.y_train, epochs=5, batch_size=32, callbacks=[self.tensorboard_callback] )
         return self.model.get_weights(), len(self.x_train), {}
 
        

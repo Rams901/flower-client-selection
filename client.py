@@ -8,13 +8,17 @@ from flwr_datasets import FederatedDataset
 import tensorflow as tf
 from tensorflow.python.keras.models import Sequential
 from tensorflow.python.keras.layers import Dense
+
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras import Sequential
+from tensorflow.keras.activations import sigmoid
 # from tensorflow.python.keras.optimizers import Adam
 # Make TensorFlow log less verbose
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 # Load data with Flower Datasets (fdsset)
 # fds = FederatedDataset(dataset="cifar10", partitioners={"train": 10})
-fds=pd.read_csv('datasets\data_acs.csv')
+fds=pd.read_csv('datasets/data_acs.csv')
 from sklearn.model_selection import train_test_split
 
 X = fds.drop(columns = "ESR")

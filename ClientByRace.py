@@ -9,6 +9,7 @@ from tensorflow.python.keras.layers import Dense
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 from tensorflow.python.keras.layers import Dense, Dropout
+from tensorflow.keras.callbacks import TensorBoard
 
 import argparse
 
@@ -54,6 +55,7 @@ RACE_DISTRIBUTION = {
     3.0: 0.2 # Race 2 biased client
     # Add other races with their biased percentages
 }
+
 class FlowerClient(fl.client.NumPyClient):
     def __init__(self, client_id, race_distribution, x_train, x_test, y_train, y_test, model):
         self.client_id = client_id
@@ -127,6 +129,7 @@ def main():
     args = parser.parse_args()
 
     client_id = int(args.race)
+    tensorboard_callback = TensorBoard(log_dir="logs/sequantial_client_{client_id}", histogram_freq=1, write_images=True)
 
     fl.client.start_client(
         server_address="127.0.0.1:8081",
