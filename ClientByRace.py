@@ -50,8 +50,8 @@ def eval_learning(y_true, y_pred):
 
 RACE_DISTRIBUTION = {
     1.0: 0.7,  # Race 1 biased client
-    2.0: 0.1, 
-    3.0: 0.2 # Race 2 biased client
+    2.0: 0.1,  # Race 2 biased client
+    3.0: 0.2
     # Add other races with their biased percentages
 }
 class FlowerClient(fl.client.NumPyClient):
@@ -63,8 +63,9 @@ class FlowerClient(fl.client.NumPyClient):
         # Generate biased datasets based on race distribution
         client_data = fds[fds['RAC1P'] == race_distribution[client_id]]
         client_data = client_data.sample(frac=SAMPLING_FRACTION)
+        print("Client data",client_data.head(5) )
         biased_data = fds[fds['RAC1P'] != race_distribution[client_id]]
-
+        print(biased_data.head(5))
         client_data = pd.concat([biased_data.sample(frac=(1 - SAMPLING_FRACTION)), client_data])
         print(client_data.head(5))
     def get_parameters(self, config):
