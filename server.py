@@ -184,7 +184,7 @@ class AdjustedClientManager(ClientManager):
 
 # Start Flower server
 fl.server.start_server(
-    server_address="0.0.0.0:8081",
+    server_address="0.0.0.0:8080",
     client_manager=AdjustedClientManager(),
     config=fl.server.ServerConfig(num_rounds=3),
     strategy=strategy,

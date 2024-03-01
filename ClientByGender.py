@@ -88,36 +88,57 @@ class FlowerClient(fl.client.NumPyClient):
 
        
 
-    def evaluate(self, parameters, config):
-        
-        self.model.set_weights(parameters)
-        loss, accuracy = self.model.evaluate(self.x_test, self.y_test)
-        y_pred = self.model.predict(self.x_test).astype('int8')
-        print("y_pred",y_pred)
-        # male_indices = (self.x_test['SEX'] == 1.0).values
-        # female_indices = (self.x_test['SEX'] == 2.0).values
-        
-        print(self.male_samples)
-        male_predictions = y_pred[self.male_samples]
-        female_predictions = y_pred[self.female_samples]
-        print("femal predictions:",female_predictions)
-        print("male predictions : ",male_predictions)
-        print("Mean male prediction:", np.mean(male_predictions), "Mean female prediction:", np.mean(female_predictions))
-        spd = np.abs(np.mean(male_predictions) - np.mean(female_predictions))
+def evaluate(self, parameters, config):
+    self.model.set_weights(parameters)
+    loss, accuracy = self.model.evaluate(self.x_test, self.y_test)
+    y_pred = self.model.predict(self.x_test).astype('int8')
 
-        print(f"SPD: {spd}")
+    spd_values = []
+    equal_opportunity_values = []
 
-        acc, rec, prec, f1 = eval_learning(self.y_test, y_pred)
-        output_dict = {
-            "accuracy": accuracy,
-            "acc": acc,
-            "rec": rec,
-            "prec": prec,
-            "f1": f1,
-            "spd": spd,
-        }
+    for gender in self.gender_distribution:
+        gender_indices = np.where(self.x_test['SEX'].values == gender)[0]
+        gender_predictions = y_pred[gender_indices]
+        other_indices = np.where(self.x_test['SEX'].values != gender)[0]
+        other_predictions = y_pred[other_indices]
 
-        return loss, len(self.x_test), output_dict
+        print(f"Gender {gender}: Mean gender prediction:", np.mean(gender_predictions), "Mean other prediction:", np.mean(other_predictions))
+
+        # Calculate SPD (Statistical Parity Difference)
+        spd = np.abs(np.mean(gender_predictions) - np.mean(other_predictions))
+        spd_values.append(spd)
+        print(f"SPD for Gender {gender}: {spd}")
+
+        # Calculate Equal Opportunity for the positive class (ESR=1)
+        gender_true_positives = np.sum(gender_predictions & (self.y_test[gender_indices] == 1))
+        other_true_positives = np.sum(other_predictions & (self.y_test[other_indices] == 1))
+
+        gender_positive_rate = gender_true_positives / np.sum(self.y_test[gender_indices] == 1)
+        other_positive_rate = other_true_positives / np.sum(self.y_test[other_indices] == 1)
+
+        equal_opportunity = np.abs(gender_positive_rate - other_positive_rate)
+        equal_opportunity_values.append(equal_opportunity)
+        print(f"Equal Opportunity for Gender {gender}: {equal_opportunity}")
+
+    avg_spd = np.mean(spd_values)
+    avg_equal_opportunity = np.mean(equal_opportunity_values)
+
+    print(f"Average SPD across all genders: {avg_spd}")
+    print(f"Average Equal Opportunity across all genders: {avg_equal_opportunity}")
+
+    acc, rec, prec, f1 = eval_learning(self.y_test, y_pred)
+    output_dict = {
+        "accuracy": accuracy,
+        "acc": acc,
+        "rec": rec,
+        "prec": prec,
+        "f1": f1,
+        "avg_spd": avg_spd,
+        "avg_equal_opportunity": avg_equal_opportunity,
+    }
+
+    return loss, len(self.x_test), output_dict
+
 
 def main():
     input_size = x_train.shape[1]
@@ -134,7 +155,7 @@ def main():
     client_id = int(args.gender)
 
     fl.client.start_client(
-        server_address="127.0.0.1:8081",
+        server_address="127.0.0.1:8080",
         client=FlowerClient(client_id, gender_distribution, x_train, x_test, y_train, y_test, model).to_client()
     )
 
