@@ -15,12 +15,15 @@ import argparse
 # Make TensorFlow log less verbose
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
+
 # Constants
 SAMPLING_FRACTION = 0.8
 
-fds = pd.read_csv('datasets\data_acs.csv')
+fds = pd.read_csv('datasets/data_acs.csv')
 X = fds.drop(columns="ESR")
+
 y = fds['ESR']
+
 x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 def build_model(input_size):
@@ -49,10 +52,9 @@ def eval_learning(y_true, y_pred):
     return acc, rec, prec, f1
 
 class FlowerClient(fl.client.NumPyClient):
-    def __init__(self, client_id, gender_distribution, x_train, x_test, y_train, y_test, model):
+    def __init__(self, client_id, gender_distribution,):
         self.client_id = client_id
         self.gender_distribution = gender_distribution
-        self.model = model
 
         client_data = fds[fds['SEX'] == gender_distribution[client_id]]
         client_data = client_data.sample(frac=SAMPLING_FRACTION)
@@ -72,7 +74,8 @@ class FlowerClient(fl.client.NumPyClient):
         self.y_train, self.y_test = np.asarray(y_train).astype('int8'),  np.asarray(y_test).astype('int8')
 
         self.x_train, self.x_test, = np.asarray(x_train).astype('float32'),  np.asarray(x_test).astype('float32')
-        
+        self.model = build_model(self.x_train.shape)
+
     def get_parameters(self, config):
         return self.model.get_weights()
 
@@ -89,6 +92,7 @@ class FlowerClient(fl.client.NumPyClient):
        
 
 def evaluate(self, parameters, config):
+
     self.model.set_weights(parameters)
     loss, accuracy = self.model.evaluate(self.x_test, self.y_test)
     y_pred = self.model.predict(self.x_test).astype('int8')
@@ -156,7 +160,7 @@ def main():
 
     fl.client.start_client(
         server_address="127.0.0.1:8080",
-        client=FlowerClient(client_id, gender_distribution, x_train, x_test, y_train, y_test, model).to_client()
+        client=FlowerClient(client_id, gender_distribution,).to_client()
     )
 
 if __name__ == "__main__":
